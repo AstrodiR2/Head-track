@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEAD TRACKER</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --accent: #00ffcc;
+    --accent2: #ff3366; --text: #e8e8f0; --muted: #555570;
+    --border: rgba(0,255,204,0.15);
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Space Mono', monospace; min-height: 100vh; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+
+  .safety-banner { width: 100%; background: linear-gradient(90deg, rgba(0,255,204,0.08), rgba(0,255,204,0.03)); border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--accent); letter-spacing: 0.05em; }
+  .safety-banner .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+
+  header { padding: 28px 24px 12px; text-align: center; width: 100%; max-width: 900px; }
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(40px, 9vw, 88px); letter-spacing: 0.08em; color: var(--text); line-height: 0.9; }
+  h1 span { color: var(--accent); }
+  .subtitle { font-size: 10px; color: var(--muted); letter-spacing: 0.2em; margin-top: 6px; text-transform: uppercase; }
+
+  .app { width: 100%; max-width: 900px; padding: 12px 16px 40px; display: flex; flex-direction: column; gap: 12px; }
+
+  .video-section { position: relative; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; background: #050508; aspect-ratio: 16/9; }
+  #bgVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.09s ease-out; will-change: transform; }
+
+  .overlay-cam { position: absolute; bottom: 10px; right: 10px; width: 110px; height: 82px; border: 1px solid var(--accent); border-radius: 2px; overflow: hidden; background: #000; box-shadow: 0 0 16px rgba(0,255,204,0.25); display: none; }
+  .overlay-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .overlay-cam canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+
+  .hud { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+  .hud-badge { display: flex; align-items: center; gap: 6px; background: rgba(10,10,15,0.82); border: 1px solid var(--border); padding: 4px 10px; border-radius: 2px; font-size: 9px; letter-spacing: 0.1em; backdrop-filter: blur(6px); }
+  .hud-badge .ind { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+  .hud-badge.on .ind { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 1.5s infinite; }
+  .hud-badge.warn .ind { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+
+  .no-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 0.15em; color: var(--muted); opacity: 0; transition: opacity 0.4s; pointer-events: none; background: rgba(10,10,15,0.4); backdrop-filter: blur(2px); }
+  .no-face.show { opacity: 1; }
+
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ctrl-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 14px; }
+  .ctrl-label { font-size: 9px; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; }
+
+  button { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 0.08em; border: 1px solid var(--border); background: transparent; color: var(--text); padding: 7px 14px; border-radius: 2px; cursor: pointer; transition: all .15s; text-transform: uppercase; }
+  button:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,255,204,.05); }
+  button.pri { border-color: var(--accent); color: var(--accent); background: rgba(0,255,204,.08); }
+  button.pri:hover { background: rgba(0,255,204,.18); }
+
+  .srow { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .srow label { font-size: 9px; color: var(--muted); min-width: 72px; }
+  input[type=range] { flex: 1; -webkit-appearance: none; height: 2px; background: var(--border); border-radius: 1px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 6px rgba(0,255,204,.5); }
+  .sv { font-size: 10px; color: var(--accent); min-width: 30px; text-align: right; }
+
+  .vgrid { display: flex; gap: 6px; flex-wrap: wrap; }
+  .vt { width: 72px; height: 44px; border: 1px solid var(--border); border-radius: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; transition: border-color .15s; }
+  .vt:hover,.vt.act { border-color: var(--accent); color: var(--accent); }
+
+  .coords { display: flex; gap: 14px; flex-wrap: wrap; }
+  .ci { font-size: 10px; color: var(--muted); }
+  .ci span { color: var(--accent); margin-left: 3px; }
+
+  #permScreen { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .pbox { max-width: 440px; width: 100%; padding: 36px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); text-align: center; }
+  .pico { font-size: 44px; margin-bottom: 12px; }
+  .ptitle { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: .1em; margin-bottom: 6px; }
+  .ptxt { font-size: 11px; line-height: 1.7; color: var(--muted); margin-bottom: 20px; }
+  .ptxt strong { color: var(--accent); }
+  .plist { list-style: none; text-align: left; margin-bottom: 22px; display: flex; flex-direction: column; gap: 7px; }
+  .plist li { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .plist li::before { content: '✓'; color: var(--accent); font-weight: bold; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="permScreen">
+  <div class="pbox">
+    <div class="pico">🔒</div>
+    <div class="ptitle">БЕЗОПАСНЫЙ РЕЖИМ</div>
+    <p class="ptxt">Сайт использует камеру <strong>только локально</strong>.<br>Всё обрабатывается в твоём браузере.</p>
+    <ul class="plist">
+      <li>Видео с камеры не записывается</li>
+      <li>Данные никуда не отправляются</li>
+      <li>Нет сервера — только твой браузер</li>
+      <li>Работает полностью офлайн</li>
+    </ul>
+    <button class="pri" onclick="startApp()" style="width:100%;padding:13px;font-size:12px;">ВКЛЮЧИТЬ КАМЕРУ</button>
+    <p style="margin-top:12px;font-size:9px;color:var(--muted)">Нет камеры? Работает и с мышью (демо-режим)</p>
+  </div>
+</div>
+
+<div class="safety-banner">
+  <div class="dot"></div>
+  ЛОКАЛЬНАЯ ОБРАБОТКА — данные с камеры не покидают устройство
+</div>
+
+<header>
+  <h1>HEAD<span>TRACK</span></h1>
+  <p class="subtitle">real-time face tracking · parallax effect</p>
+</header>
+
+<div class="app">
+  <div class="video-section" id="vs">
+    <video id="bgVideo" autoplay loop muted playsinline crossorigin="anonymous">
+      <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+    </video>
+
+    <div class="overlay-cam" id="camPrev">
+      <video id="camVid" autoplay muted playsinline></video>
+      <canvas id="faceC"></canvas>
+    </div>
+
+    <div class="hud">
+      <div class="hud-badge" id="camB"><div class="ind"></div><span id="camTxt">КАМЕРА ВЫКЛ</span></div>
+      <div class="hud-badge" id="faceB"><div class="ind"></div><span id="faceTxt">ЛИЦО НЕ НАЙДЕНО</span></div>
+    </div>
+
+    <div class="no-face" id="nfMsg">НЕТ ЛИЦА В КАДРЕ</div>
+  </div>
+
+  <div class="coords" id="cr" style="display:none">
+    <div class="ci">X: <span id="cX">—</span></div>
+    <div class="ci">Y: <span id="cY">—</span></div>
+    <div class="ci">СМЕЩЕНИЕ: <span id="cS">0/0</span></div>
+    <div class="ci">РЕЖИМ: <span id="cM">—</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl-card">
+      <div class="ctrl-label">// Трекинг</div>
+      <div class="srow"><label>Чувствит.</label><input type="range" id="sl1" min="1" max="10" value="5" oninput="sens=+this.value;document.getElementById('sv1').textContent=this.value"><span class="sv" id="sv1">5</span></div>
+      <div class="srow"><label>Плавность</label><input type="range" id="sl2" min="1" max="20" value="8" oninput="smooth=+this.value;document.getElementById('sv2').textContent=this.value"><span class="sv" id="sv2">8</span></div>
+      <div class="srow"><label>Масштаб</label><input type="range" id="sl3" min="100" max="140" value="110" oninput="bgSc=this.value/100;document.getElementById('sv3').textContent=this.value+'%'"><span class="sv" id="sv3">110%</span></div>
+    </div>
+    <div class="ctrl-card">
+      <div class="ctrl-label">// Видео</div>
+      <div class="vgrid">
+        <div class="vt act" onclick="sw(0,this)">Bunny</div>
+        <div class="vt" onclick="sw(1,this)">Nature</div>
+        <div class="vt" onclick="sw(2,this)">Demo 3</div>
+        <div class="vt" onclick="sw(3,this)">Demo 4</div>
+      </div>
+      <div style="margin-top:10px"><button onclick="document.getElementById('fi').click()">📁 Свой файл</button></div>
+      <input type="file" id="fi" accept="video/*" style="display:none" onchange="loadF(event)">
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+const VIDS = [
+  'https://www.w3schools.com/html/mov_bbb.mp4',
+  'https://www.w3schools.com/html/movie.mp4',
+  'https://www.w3schools.com/html/mov_bbb.mp4',
+  'https://www.w3schools.com/html/movie.mp4',
+];
+
+let sens = 5, smooth = 8, bgSc = 1.1;
+let curX = 0, curY = 0, tX = 0, tY = 0;
+let faceOn = false, nfTimer = null;
+let modelsLoaded = false;
+
+const bgVid = document.getElementById('bgVideo');
+const camVid = document.getElementById('camVid');
+const faceC = document.getElementById('faceC');
+const nfMsg = document.getElementById('nfMsg');
+const camB = document.getElementById('camB');
+const faceB = document.getElementById('faceB');
+const camPrev = document.getElementById('camPrev');
+
+async function startApp() {
+  document.getElementById('permScreen').style.display = 'none';
+  document.getElementById('cr').style.display = 'flex';
+
+  // Load models
+  try {
+    await faceapi.nets.tinyFaceDetector.loadFromUri(
+      'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'
+    );
+    modelsLoaded = true;
+  } catch(e) { modelsLoaded = false; }
+
+  // Try camera
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width:320, height:240, facingMode:'user' }, audio: false });
+    camVid.srcObject = stream;
+    camPrev.style.display = 'block';
+    setBadge(camB, 'on', 'КАМЕРА ВКЛ');
+    camVid.addEventListener('loadeddata', () => {
+      faceC.width = camVid.videoWidth;
+      faceC.height = camVid.videoHeight;
+      if (modelsLoaded) startFace(); else startMouse();
+      document.getElementById('cM').textContent = modelsLoaded ? 'FACE API' : 'МЫШЬ';
+    });
+  } catch(e) {
+    setBadge(camB, 'warn', 'НЕТ КАМЕРЫ');
+    startMouse();
+    document.getElementById('cM').textContent = 'ДЕМО/МЫШЬ';
+  }
+
+  animLoop();
+}
+
+function startMouse() {
+  const vs = document.getElementById('vs');
+  vs.addEventListener('mousemove', e => {
+    const r = vs.getBoundingClientRect();
+    tX = -((e.clientX - r.left) / r.width - 0.5) * 2;
+    tY = -((e.clientY - r.top) / r.height - 0.5) * 2;
+    setFace(true);
+  });
+  vs.addEventListener('mouseleave', () => setFace(false));
+}
+
+async function startFace() {
+  const detect = async () => {
+    try {
+      const det = await faceapi.detectSingleFace(camVid, new faceapi.TinyFaceDetectorOptions({ inputSize:160, scoreThreshold:0.4 }));
+      if (det) {
+        const b = det.box;
+        const vw = camVid.videoWidth, vh = camVid.videoHeight;
+        const fx = (b.x + b.width/2) / vw;
+        const fy = (b.y + b.height/2) / vh;
+        tX = -(fx - 0.5) * 2;
+        tY = -(fy - 0.5) * 2;
+        setFace(true);
+        drawBox(b, vw, vh);
+        document.getElementById('cX').textContent = (fx*100).toFixed(0)+'%';
+        document.getElementById('cY').textContent = (fy*100).toFixed(0)+'%';
+      } else {
+        setFace(false);
+        faceC.getContext('2d').clearRect(0,0,faceC.width,faceC.height);
+      }
+    } catch(e){}
+    setTimeout(detect, 90);
+  };
+  detect();
+}
+
+function drawBox(b, vw, vh) {
+  const ctx = faceC.getContext('2d');
+  ctx.clearRect(0,0,faceC.width,faceC.height);
+  const sx = faceC.width/vw, sy = faceC.height/vh;
+  // mirror
+  const mx = faceC.width - (b.x + b.width)*sx;
+  ctx.strokeStyle = '#00ffcc'; ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 10; ctx.shadowColor = '#00ffcc';
+  ctx.strokeRect(mx, b.y*sy, b.width*sx, b.height*sy);
+  const cs = 5; ctx.fillStyle='#00ffcc';
+  [[mx,b.y*sy],[mx+b.width*sx-cs,b.y*sy],[mx,b.y*sy+b.height*sy-cs],[mx+b.width*sx-cs,b.y*sy+b.height*sy-cs]]
+    .forEach(([x,y])=>ctx.fillRect(x,y,cs,cs));
+}
+
+function setFace(v) {
+  faceOn = v;
+  if (v) {
+    clearTimeout(nfTimer);
+    nfMsg.classList.remove('show');
+    setBadge(faceB, 'on', 'ЛИЦО НАЙДЕНО');
+  } else {
+    nfTimer = setTimeout(() => {
+      nfMsg.classList.add('show');
+      setBadge(faceB, '', 'ЛИЦО НЕ НАЙДЕНО');
+      tX = 0; tY = 0;
+    }, 500);
+  }
+}
+
+function setBadge(el, cls, txt) {
+  el.className = 'hud-badge' + (cls ? ' '+cls : '');
+  el.querySelector('span').textContent = txt;
+}
+
+function animLoop() {
+  const lerp = 1 / (smooth * 0.7 + 1);
+  curX += (tX - curX) * lerp;
+  curY += (tY - curY) * lerp;
+  const max = sens * 2.8;
+  const sx = curX * max, sy = curY * max;
+  bgVid.style.transform = `scale(${bgSc}) translate(${sx}px,${sy}px)`;
+  document.getElementById('cS').textContent = sx.toFixed(1)+'/'+sy.toFixed(1);
+  requestAnimationFrame(animLoop);
+}
+
+function sw(i, el) {
+  document.querySelectorAll('.vt').forEach(t=>t.classList.remove('act'));
+  el.classList.add('act');
+  bgVid.src = VIDS[i]; bgVid.load(); bgVid.play();
+}
+function loadF(e) {
+  const f = e.target.files[0]; if (!f) return;
+  bgVid.src = URL.createObjectURL(f); bgVid.load(); bgVid.play();
+  document.querySelectorAll('.vt').forEach(t=>t.classList.remove('act'));
+}
+</script>
+</body>
+</html>
